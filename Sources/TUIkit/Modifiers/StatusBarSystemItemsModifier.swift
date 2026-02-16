@@ -28,6 +28,9 @@ struct StatusBarSystemItemsModifier<Content: View>: View {
     /// The content view.
     let content: Content
 
+    /// Whether to show system items at all (quit, theme, appearance).
+    let showSystem: Bool
+
     /// Whether to show the theme item (`t`).
     let showTheme: Bool
 
@@ -44,6 +47,7 @@ struct StatusBarSystemItemsModifier<Content: View>: View {
 extension StatusBarSystemItemsModifier: Renderable {
     func renderToBuffer(context renderContext: RenderContext) -> FrameBuffer {
         let statusBar = renderContext.environment.statusBar
+        statusBar.showSystemItems = showSystem
         statusBar.showThemeItem = showTheme
         statusBar.showAppearanceItem = showAppearance
 
@@ -64,20 +68,28 @@ public extension View {
     /// # Example
     ///
     /// ```swift
+    /// // Hide all system items (including quit)
+    /// ContentView()
+    ///     .statusBarSystemItems(show: false)
+    ///
+    /// // Show theme and appearance items
     /// ContentView()
     ///     .statusBarSystemItems(theme: true, appearance: true)
     /// ```
     ///
     /// - Parameters:
+    ///   - show: Whether to show system items at all. Default is `true`. Set to `false` to hide all system items.
     ///   - theme: Whether to show the theme switcher (`t theme`). Default is `false`.
     ///   - appearance: Whether to show the appearance switcher (`a appearance`). Default is `false`.
     /// - Returns: A view with the configured system items.
     func statusBarSystemItems(
+        show: Bool = true,
         theme: Bool = false,
         appearance: Bool = false
     ) -> some View {
         StatusBarSystemItemsModifier(
             content: self,
+            showSystem: show,
             showTheme: theme,
             showAppearance: appearance
         )

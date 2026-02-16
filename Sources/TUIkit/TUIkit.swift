@@ -73,5 +73,5 @@ public func renderOnce<Content: View>(@ViewBuilder content: () -> Content) {
 ///
 /// - Note: This function can be called from any thread.
 public func quit() {
-    RenderNotifier.current.requestShutdown()
+    AppState.shared.requestShutdown()
 }

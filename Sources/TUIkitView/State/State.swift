@@ -29,6 +29,7 @@ public final class AppState: Sendable {
     /// Internal state protected by a lock.
     private struct StateData: Sendable {
         var needsRender = false
+        var needsCacheClear = false
         var needsShutdown = false
         var observers: [@Sendable () -> Void] = []
     }
@@ -61,8 +62,7 @@ public extension AppState {
             observer()
         }
     }
-
-<<<<<<< HEAD:Sources/TUIkitView/State/State.swift
+    
     /// Marks state as changed and requests a full cache clear on next render.
     ///
     /// Called by `withObservationTracking` when an `@Observable` property
@@ -77,7 +77,11 @@ public extension AppState {
             state.needsCacheClear = true
             return state.observers
         }
-=======
+        for observer in observers {
+            observer()
+        }
+    }
+
     /// Requests a graceful shutdown of the application.
     ///
     /// This method is thread-safe and can be called from any thread.
@@ -102,7 +106,6 @@ public extension AppState {
         }
         // Notify observers to wake up the run loop
         let observers = lock.withLock { $0.observers }
->>>>>>> a08c7cd (support quit and support render loop):Sources/TUIkit/State/State.swift
         for observer in observers {
             observer()
         }
@@ -118,7 +121,7 @@ extension AppState {
     }
 
     /// Whether a shutdown was requested.
-    var needsShutdown: Bool {
+    public var needsShutdown: Bool {
         lock.withLock { $0.needsShutdown }
     }
 
