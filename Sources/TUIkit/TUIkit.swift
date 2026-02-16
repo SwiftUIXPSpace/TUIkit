@@ -48,3 +48,30 @@ public func renderOnce<Content: View>(@ViewBuilder content: () -> Content) {
     let renderer = ViewRenderer()
     renderer.render(view)
 }
+
+/// Requests a graceful shutdown of the running TUIkit application.
+///
+/// This function triggers a clean exit that allows TUIkit to:
+/// - Restore the terminal to its original state
+/// - Show the cursor
+/// - Exit the alternate screen buffer
+/// - Clean up any resources
+///
+/// Use this instead of calling `exit()` directly to ensure proper terminal cleanup.
+///
+/// # Example
+///
+/// ```swift
+/// struct ContentView: View {
+///     var body: some View {
+///         Button("Quit") {
+///             TUIkit.quit()
+///         }
+///     }
+/// }
+/// ```
+///
+/// - Note: This function can be called from any thread.
+public func quit() {
+    RenderNotifier.current.requestShutdown()
+}

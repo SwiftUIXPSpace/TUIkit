@@ -153,10 +153,14 @@ extension AppRunner {
         // Initial render
         renderer.render(pulsePhase: pulseTimer.phase, cursorTimer: cursorTimer)
 
-        // Main loop
+        // Main loop - use RunLoop to support Swift concurrency
+        let runLoop = RunLoop.current
+        var lastFrameTime = Date()
+        let frameInterval: TimeInterval = 0.033  // ~30 FPS
+
         while isRunning {
-            // Check for graceful shutdown request (from SIGINT handler)
-            if signals.shouldShutdown {
+            // Check for graceful shutdown request (from SIGINT handler or programmatic)
+            if signals.shouldShutdown || appState.needsShutdown {
                 isRunning = false
                 break
             }
@@ -185,10 +189,15 @@ extension AppRunner {
                 eventsProcessed += 1
             }
 
-            // Sleep ~24ms to yield CPU.
-            // This sets the maximum frame rate to ~42 FPS.
-            //
-            usleep(23_800)
+            // Use RunLoop to yield to Swift concurrency tasks
+            // This allows Task closures to execute
+            let now = Date()
+            let timeSinceLastFrame = now.timeIntervalSince(lastFrameTime)
+            let timeUntilNextFrame = max(0, frameInterval - timeSinceLastFrame)
+            
+            // Run the run loop for a short time to process Swift concurrency tasks
+            runLoop.run(mode: .default, before: now.addingTimeInterval(timeUntilNextFrame))
+            lastFrameTime = Date()
         }
 
         // Stop pulse timer before cleanup

@@ -29,7 +29,7 @@ public final class AppState: Sendable {
     /// Internal state protected by a lock.
     private struct StateData: Sendable {
         var needsRender = false
-        var needsCacheClear = false
+        var needsShutdown = false
         var observers: [@Sendable () -> Void] = []
     }
 
@@ -62,6 +62,7 @@ public extension AppState {
         }
     }
 
+<<<<<<< HEAD:Sources/TUIkitView/State/State.swift
     /// Marks state as changed and requests a full cache clear on next render.
     ///
     /// Called by `withObservationTracking` when an `@Observable` property
@@ -76,6 +77,32 @@ public extension AppState {
             state.needsCacheClear = true
             return state.observers
         }
+=======
+    /// Requests a graceful shutdown of the application.
+    ///
+    /// This method is thread-safe and can be called from any thread.
+    /// It sets a shutdown flag that the main run loop checks, allowing
+    /// for proper cleanup (restoring terminal state, showing cursor, etc.)
+    /// before exiting.
+    ///
+    /// Use this instead of calling `exit()` directly to ensure the terminal
+    /// is properly restored.
+    ///
+    /// # Example
+    ///
+    /// ```swift
+    /// Button("Quit") {
+    ///     RenderNotifier.current.requestShutdown()
+    /// }
+    /// ```
+    func requestShutdown() {
+        lock.withLock { state in
+            state.needsShutdown = true
+            state.needsRender = true  // Trigger a render cycle to check shutdown
+        }
+        // Notify observers to wake up the run loop
+        let observers = lock.withLock { $0.observers }
+>>>>>>> a08c7cd (support quit and support render loop):Sources/TUIkit/State/State.swift
         for observer in observers {
             observer()
         }
@@ -88,6 +115,11 @@ extension AppState {
     /// Whether state has changed since last render.
     public var needsRender: Bool {
         lock.withLock { $0.needsRender }
+    }
+
+    /// Whether a shutdown was requested.
+    var needsShutdown: Bool {
+        lock.withLock { $0.needsShutdown }
     }
 
     /// Registers an observer to be notified of state changes.
