@@ -37,7 +37,14 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
         let listHasFocus: Bool
 
         if rows.isEmpty {
-            contentLines = [emptyPlaceholder]
+            // When hasExplicitWidth, expand placeholder to fill available inner width.
+            // This matches the non-empty path behavior (rowWidth = availableWidth - 2).
+            if context.hasExplicitWidth {
+                let rowWidth = max(emptyPlaceholder.count, context.availableWidth - 2)
+                contentLines = [renderPlainLine(line: emptyPlaceholder, rowWidth: rowWidth, backgroundColor: nil)]
+            } else {
+                contentLines = [emptyPlaceholder]
+            }
             listHasFocus = false
         } else {
             // Calculate viewport height (reserve space for scroll indicators if needed)

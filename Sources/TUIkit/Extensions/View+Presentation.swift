@@ -116,12 +116,16 @@ extension View {
     /// }
     /// ```
     ///
-    /// - Parameter content: A ViewBuilder returning the header content.
+    /// - Parameters:
+    ///   - showDivider: Whether to show the thin divider line below the header.
+    ///     Defaults to `true`.
+    ///   - content: A ViewBuilder returning the header content.
     /// - Returns: A view that declares the app header content.
     public func appHeader<Header: View>(
+        showDivider: Bool = true,
         @ViewBuilder content: () -> Header
     ) -> some View {
-        AppHeaderModifier(content: self, header: content())
+        AppHeaderModifier(content: self, header: content(), showDivider: showDivider)
     }
 }
 

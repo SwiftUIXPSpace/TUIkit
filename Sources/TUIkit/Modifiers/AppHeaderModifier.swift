@@ -35,6 +35,9 @@ struct AppHeaderModifier<Content: View, Header: View>: View {
     /// The header content builder.
     let header: Header
 
+    /// Whether to show the divider line below the header.
+    let showDivider: Bool
+
     var body: Never {
         fatalError("AppHeaderModifier renders via Renderable")
     }
@@ -50,6 +53,7 @@ extension AppHeaderModifier: Renderable {
         // The RenderLoop will pick it up and render it separately.
         let headerBuffer = TUIkit.renderToBuffer(header, context: context)
         appHeader.contentBuffer = headerBuffer
+        appHeader.showDivider = showDivider
 
         return TUIkit.renderToBuffer(content, context: context)
     }

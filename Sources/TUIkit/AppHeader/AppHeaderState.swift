@@ -38,6 +38,12 @@ final class AppHeaderState: @unchecked Sendable {
     /// at the start of each render pass by `RenderLoop`.
     var contentBuffer: FrameBuffer?
 
+    /// Whether to show the divider line below the header content.
+    ///
+    /// Defaults to `true`. Set to `false` via the `.appHeader(showDivider:)`
+    /// modifier to hide the thin border line at the bottom of the header.
+    var showDivider: Bool = true
+
     /// The height from the previous render pass, used as an estimate
     /// for layout calculations before the current pass populates the buffer.
     ///
@@ -54,11 +60,12 @@ final class AppHeaderState: @unchecked Sendable {
 
     /// The height of the header in terminal lines.
     ///
-    /// Returns the content height plus one line for the divider.
+    /// Returns the content height plus one line for the divider (when enabled).
     /// Returns 0 when no content is set (header hidden).
     var height: Int {
         guard hasContent else { return 0 }
-        return (contentBuffer?.height ?? 0) + 1
+        let dividerHeight = showDivider ? 1 : 0
+        return (contentBuffer?.height ?? 0) + dividerHeight
     }
 
     /// The estimated height for the current frame, based on the previous

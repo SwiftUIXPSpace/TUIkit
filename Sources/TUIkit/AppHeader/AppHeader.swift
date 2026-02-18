@@ -34,6 +34,7 @@ extension AppHeader: Renderable {
     func renderToBuffer(context: RenderContext) -> FrameBuffer {
         let width = context.availableWidth
         let palette = context.environment.palette
+        let appHeaderState = context.environment.appHeader
         var lines: [String] = []
 
         // Content lines padded to full width
@@ -41,10 +42,12 @@ extension AppHeader: Renderable {
             lines.append(line.padToVisibleWidth(width))
         }
 
-        // Thin divider line
-        let divider = String(repeating: "─", count: width)
-        let styledDivider = ANSIRenderer.colorize(divider, foreground: palette.border)
-        lines.append(styledDivider)
+        // Thin divider line (only when showDivider is enabled)
+        if appHeaderState.showDivider {
+            let divider = String(repeating: "─", count: width)
+            let styledDivider = ANSIRenderer.colorize(divider, foreground: palette.border)
+            lines.append(styledDivider)
+        }
 
         return FrameBuffer(lines: lines)
     }
