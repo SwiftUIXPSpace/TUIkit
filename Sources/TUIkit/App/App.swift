@@ -146,6 +146,9 @@ extension AppRunner {
             appState?.setNeedsRender()
         }
 
+        // Set global focus manager reference
+        sharedFocusManager = focusManager
+
         isRunning = true
 
         // Start animation timers

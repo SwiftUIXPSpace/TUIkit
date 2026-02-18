@@ -57,6 +57,9 @@ public final class FocusManager: @unchecked Sendable {
     /// The currently focused element's ID within the active section.
     private var focusedID: String?
 
+    /// Pending focus request to be processed at the end of the render pass.
+    private var pendingFocusID: String?
+
     /// Callback triggered when focus changes (element or section).
     public var onFocusChange: (() -> Void)?
 
@@ -270,6 +273,26 @@ public extension FocusManager {
         activeSectionID == sectionID
     }
 
+    /// Clears the current focus, allowing global shortcuts to work.
+    ///
+    /// Call this when the user presses ESC to exit a focused element
+    /// (like TextField) so that global shortcuts (like 'q' to quit) work.
+    func clearFocus() {
+        notifyFocusLost()
+        focusedID = nil
+        onFocusChange?()
+    }
+
+    /// Requests focus for a specific element ID at the end of the current render pass.
+    ///
+    /// Use this when you need to programmatically focus an element (e.g., after
+    /// a processing state ends). The focus will be applied during `endRenderPass()`.
+    ///
+    /// - Parameter id: The focus ID of the element to focus.
+    func requestFocus(id: String) {
+        pendingFocusID = id
+    }
+
     /// Dispatches a key event through the focus system.
     ///
     /// Navigation model:
@@ -288,6 +311,12 @@ public extension FocusManager {
             if focused.handleKeyEvent(event) {
                 return true
             }
+        }
+
+        // ESC key: clear focus so user can use global shortcuts (like 'q' to quit)
+        if event.key == .escape {
+            clearFocus()
+            return true
         }
 
         // Tab navigation: cycle sections (or elements within single section)
@@ -412,6 +441,21 @@ extension FocusManager {
             !sections.contains(where: { $0.id == activeID })
         {
             activeSectionID = sections.first?.id
+        }
+
+        // Process pending focus request first
+        if let requestedID = pendingFocusID {
+            pendingFocusID = nil
+            // Find the element and focus it
+            for section in sections {
+                if let element = section.focusables.first(where: { $0.focusID == requestedID && $0.canBeFocused }) {
+                    if activeSectionID != section.id {
+                        activeSectionID = section.id
+                    }
+                    focus(element)
+                    return
+                }
+            }
         }
 
         // Validate focused element

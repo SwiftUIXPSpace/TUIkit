@@ -75,3 +75,54 @@ public func renderOnce<Content: View>(@ViewBuilder content: () -> Content) {
 public func quit() {
     AppState.shared.requestShutdown()
 }
+
+// MARK: - Focus Management
+
+/// Global focus manager instance shared across the application.
+///
+/// This is set by `AppRunner` when the app starts and can be used
+/// to programmatically control focus from view code.
+@MainActor
+public var sharedFocusManager: FocusManager?
+
+/// Requests focus for a specific element by ID.
+///
+/// Use this to programmatically focus an element (e.g., a TextField)
+/// after a state change. The focus is applied at the end of the current render pass.
+///
+/// # Example
+///
+/// ```swift
+/// struct ContentView: View {
+///     @State var isProcessing = false
+///
+///     var body: some View {
+///         if isProcessing {
+///             Text("Processing...")
+///         } else {
+///             TextField("Input", text: $input)
+///                 .focusID("input-field")
+///         }
+///     }
+///
+///     func finishProcessing() {
+///         isProcessing = false
+///         TUIkit.requestFocus(id: "input-field")
+///     }
+/// }
+/// ```
+///
+/// - Parameter id: The focus ID of the element to focus.
+@MainActor
+public func requestFocus(id: String) {
+    sharedFocusManager?.requestFocus(id: id)
+}
+
+/// Clears the current focus.
+///
+/// Call this to remove focus from all elements, allowing global
+/// keyboard shortcuts to work.
+@MainActor
+public func clearFocus() {
+    sharedFocusManager?.clearFocus()
+}
