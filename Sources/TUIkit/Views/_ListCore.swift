@@ -7,7 +7,7 @@
 // MARK: - List Core (Internal Rendering)
 
 /// Internal core view that handles list rendering inside a ContainerView.
-struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: View>: View, Renderable {
+struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: View>: View, Renderable, Layoutable {
     let title: String?
     let content: Content
     let footer: Footer?
@@ -19,8 +19,36 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
     let emptyPlaceholder: String
     let showFooterSeparator: Bool
 
+    /// When true, the list automatically scrolls to show the last item
+    /// whenever new items are appended. Ideal for chat/log-style UIs.
+    var scrollToBottom: Bool = false
+
     var body: Never {
         fatalError("_ListCore renders via Renderable")
+    }
+
+    // MARK: - Layoutable
+
+    /// Reports the List's size requirements to parent layout containers.
+    ///
+    /// List is a greedy vertical component that should expand to fill available
+    /// height. By reporting `isHeightFlexible = true` with a small minimum
+    /// height, parent VStack can properly allocate remaining space after
+    /// fixed-height siblings (e.g., Panel, TextField) have been measured.
+    func sizeThatFits(proposal: ProposedSize, context: RenderContext) -> ViewSize {
+        let style = context.environment.listStyle
+        let borderOverhead = style.showsBorder ? 2 : 0
+        let titleOverhead = title != nil ? 1 : 0
+        let footerOverhead: Int = footer is EmptyView || footer == nil ? 0 : 2
+        let minContentHeight = 1 // At least 1 row of content
+        let minHeight = borderOverhead + titleOverhead + footerOverhead + minContentHeight
+
+        return ViewSize(
+            width: context.availableWidth,
+            height: minHeight,
+            isWidthFlexible: true,
+            isHeightFlexible: true
+        )
     }
 
     // swiftlint:disable:next function_body_length
@@ -59,18 +87,23 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
             )
 
             // Get or create persistent handler
+            // When scrollToBottom is enabled, initialize with itemCount=0 so the first
+            // render detects 0→N items increase and triggers scroll-to-bottom.
             let handlerKey = StateStorage.StateKey(identity: context.identity, propertyIndex: 0)  // handler
             let handlerBox: StateBox<ItemListHandler<SelectionValue>> = stateStorage.storage(
                 for: handlerKey,
                 default: ItemListHandler(
                     focusID: persistedFocusID,
-                    itemCount: rows.count,
+                    itemCount: scrollToBottom ? 0 : rows.count,
                     viewportHeight: viewportHeight,
                     selectionMode: selectionMode,
                     canBeFocused: !isDisabled
                 )
             )
             let handler = handlerBox.value
+
+            // Capture previous item count before updating (for scroll-to-bottom detection)
+            let previousItemCount = handler.itemCount
 
             // Update handler with current values
             handler.itemCount = rows.count
@@ -96,6 +129,14 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
             // Assign selection bindings directly (type-safe, no AnyHashable conversion)
             handler.singleSelection = singleSelection
             handler.multiSelection = multiSelection
+
+            // Auto-scroll to bottom when new items are appended (chat/log-style UIs).
+            // Only triggers when itemCount increases, so the user can still scroll up
+            // manually. The next time items are added, it will snap back to bottom.
+            if scrollToBottom && rows.count > previousItemCount && rows.count > 0 {
+                let lastSelectableIndex = selectableIndices.max() ?? (rows.count - 1)
+                handler.focusedIndex = lastSelectableIndex
+            }
 
             // Ensure focused item is visible
             handler.ensureFocusedItemVisible()

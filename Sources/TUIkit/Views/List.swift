@@ -88,6 +88,9 @@ public struct List<SelectionValue: Hashable & Sendable, Content: View, Footer: V
     /// Whether to show separator before footer.
     var showFooterSeparator: Bool
 
+    /// Whether to auto-scroll to bottom when new items are appended.
+    var scrollToBottom: Bool = false
+
     public var body: some View {
         _ListCore(
             title: title,
@@ -99,7 +102,8 @@ public struct List<SelectionValue: Hashable & Sendable, Content: View, Footer: V
             focusID: focusID,
             isDisabled: isDisabled,
             emptyPlaceholder: emptyPlaceholder,
-            showFooterSeparator: showFooterSeparator
+            showFooterSeparator: showFooterSeparator,
+            scrollToBottom: scrollToBottom
         )
     }
 }
@@ -340,6 +344,19 @@ extension List {
     public func listFooterSeparator(_ show: Bool = true) -> List<SelectionValue, Content, Footer> {
         var copy = self
         copy.showFooterSeparator = show
+        return copy
+    }
+
+    /// Enables auto-scrolling to the bottom when new items are appended.
+    ///
+    /// Ideal for chat or log-style UIs where the latest content should
+    /// always be visible.
+    ///
+    /// - Parameter enabled: Whether to enable scroll-to-bottom behavior. Defaults to `true`.
+    /// - Returns: A list with the scroll-to-bottom behavior.
+    public func listScrollToBottom(_ enabled: Bool = true) -> List<SelectionValue, Content, Footer> {
+        var copy = self
+        copy.scrollToBottom = enabled
         return copy
     }
 }
