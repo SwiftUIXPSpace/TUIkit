@@ -82,8 +82,8 @@ public struct List<SelectionValue: Hashable & Sendable, Content: View, Footer: V
     /// Whether the list is disabled.
     var isDisabled: Bool
 
-    /// The placeholder text shown when the list is empty.
-    var emptyPlaceholder: String
+    /// The placeholder view shown when the list is empty.
+    var emptyPlaceholder: AnyView
 
     /// Whether to show separator before footer.
     var showFooterSeparator: Bool
@@ -131,7 +131,7 @@ extension List {
         self.multiSelection = nil
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = true
     }
 
@@ -153,7 +153,7 @@ extension List {
         self.multiSelection = nil
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = true
     }
 }
@@ -179,7 +179,7 @@ extension List where Footer == EmptyView {
         self.multiSelection = nil
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = false
     }
 
@@ -199,7 +199,7 @@ extension List where Footer == EmptyView {
         self.multiSelection = nil
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = false
     }
 }
@@ -227,7 +227,7 @@ extension List {
         self.multiSelection = selection
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = true
     }
 
@@ -249,7 +249,7 @@ extension List {
         self.multiSelection = selection
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = true
     }
 }
@@ -275,7 +275,7 @@ extension List where Footer == EmptyView {
         self.multiSelection = selection
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = false
     }
 
@@ -295,7 +295,7 @@ extension List where Footer == EmptyView {
         self.multiSelection = selection
         self.focusID = nil
         self.isDisabled = false
-        self.emptyPlaceholder = ViewConstants.emptyListPlaceholder
+        self.emptyPlaceholder = AnyView(Text(ViewConstants.emptyListPlaceholder))
         self.showFooterSeparator = false
     }
 }
@@ -333,7 +333,33 @@ extension List {
     /// - Returns: A list with the specified empty placeholder.
     public func listEmptyPlaceholder(_ placeholder: String) -> List<SelectionValue, Content, Footer> {
         var copy = self
-        copy.emptyPlaceholder = placeholder
+        copy.emptyPlaceholder = AnyView(Text(placeholder))
+        return copy
+    }
+
+    /// Sets a custom placeholder view displayed when the list has no items.
+    ///
+    /// Use this modifier for flexible control over the empty state appearance.
+    ///
+    /// ```swift
+    /// List("Items", selection: $selected) {
+    ///     ForEach(items) { item in Text(item.name) }
+    /// }
+    /// .listEmptyPlaceholder {
+    ///     VStack {
+    ///         Text("Welcome!")
+    ///             .bold()
+    ///         Text("No items yet.")
+    ///             .dim()
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter content: A ViewBuilder that produces the placeholder view.
+    /// - Returns: A list with the specified empty placeholder view.
+    public func listEmptyPlaceholder<V: View>(@ViewBuilder content: () -> V) -> List<SelectionValue, Content, Footer> {
+        var copy = self
+        copy.emptyPlaceholder = AnyView(content())
         return copy
     }
 

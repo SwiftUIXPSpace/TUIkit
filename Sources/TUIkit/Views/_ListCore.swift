@@ -16,7 +16,7 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
     let selectionMode: SelectionMode
     let focusID: String?
     let isDisabled: Bool
-    let emptyPlaceholder: String
+    let emptyPlaceholder: AnyView
     let showFooterSeparator: Bool
 
     /// When true, the list automatically scrolls to show the last item
@@ -65,14 +65,38 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
         let listHasFocus: Bool
 
         if rows.isEmpty {
-            // When hasExplicitWidth, expand placeholder to fill available inner width.
-            // This matches the non-empty path behavior (rowWidth = availableWidth - 2).
+            // Render the placeholder view to a buffer
+            let placeholderBuffer = TUIkit.renderToBuffer(emptyPlaceholder, context: context)
+            let placeholderLines = placeholderBuffer.lines
+
+            // Calculate target content area for centering
+            let footerH = footer != nil ? 2 : 0
+            let borderH = style.showsBorder ? 2 : 0
+            let titleH = title != nil ? 1 : 0
+            let targetH = max(1, context.availableHeight - borderH - titleH - footerH)
+            let rowWidth: Int
             if context.hasExplicitWidth {
-                let rowWidth = max(emptyPlaceholder.count, context.availableWidth - 2)
-                contentLines = [renderPlainLine(line: emptyPlaceholder, rowWidth: rowWidth, backgroundColor: nil)]
+                let maxLineWidth = placeholderLines.map { $0.strippedLength }.max() ?? 0
+                rowWidth = max(maxLineWidth, context.availableWidth - 2)
             } else {
-                contentLines = [emptyPlaceholder]
+                rowWidth = placeholderLines.map { $0.strippedLength }.max() ?? 0
             }
+
+            // Center each placeholder line horizontally within rowWidth
+            let centeredLines: [String] = placeholderLines.map { line in
+                renderCenteredLine(line: line, rowWidth: rowWidth, backgroundColor: nil)
+            }
+
+            // Vertically center: add empty lines above and below
+            let placeholderHeight = centeredLines.count
+            let topPadding = max(0, (targetH - placeholderHeight) / 2)
+            let bottomPadding = max(0, targetH - placeholderHeight - topPadding)
+
+            var lines: [String] = []
+            lines.append(contentsOf: Array(repeating: "", count: topPadding))
+            lines.append(contentsOf: centeredLines)
+            lines.append(contentsOf: Array(repeating: "", count: bottomPadding))
+            contentLines = lines
             listHasFocus = false
         } else {
             // Calculate viewport height (reserve space for scroll indicators if needed)
@@ -462,6 +486,25 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
         let paddedLine = " " + line + String(repeating: " ", count: rightPadding)
 
         return paddedLine.withPersistentBackground(backgroundColor)
+    }
+
+    /// Renders a line horizontally centered within the given rowWidth.
+    /// Layout: [left padding][content][right padding]
+    private func renderCenteredLine(
+        line: String,
+        rowWidth: Int,
+        backgroundColor: Color?
+    ) -> String {
+        let lineLength = line.strippedLength
+        let totalPadding = max(0, rowWidth - lineLength)
+        let leftPad = totalPadding / 2
+        let rightPad = totalPadding - leftPad
+        let paddedLine = String(repeating: " ", count: leftPad) + line + String(repeating: " ", count: rightPad)
+
+        if let bg = backgroundColor {
+            return paddedLine.withPersistentBackground(bg)
+        }
+        return paddedLine
     }
 }
 
