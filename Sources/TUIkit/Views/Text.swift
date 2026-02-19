@@ -230,8 +230,9 @@ extension Text: Renderable, Layoutable {
 
     /// Wraps text into lines that fit a maximum character width.
     ///
-    /// Splits on word boundaries (spaces). Words longer than `maxWidth`
-    /// are placed on their own line without further splitting.
+    /// First splits on newline characters (`\n`) to respect explicit line breaks,
+    /// then splits each physical line on word boundaries (spaces).
+    /// Words longer than `maxWidth` are placed on their own line without further splitting.
     ///
     /// - Parameters:
     ///   - text: The text to wrap.
@@ -240,26 +241,40 @@ extension Text: Renderable, Layoutable {
     private func wordWrap(_ text: String, maxWidth: Int) -> [String] {
         guard maxWidth > 0 else { return [text] }
 
-        let words = text.split(separator: " ", omittingEmptySubsequences: false)
-        var lines: [String] = []
-        var currentLine = ""
+        // First, split on explicit newlines to preserve line breaks
+        let physicalLines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        var result: [String] = []
 
-        for word in words {
-            let wordStr = String(word)
-            if currentLine.isEmpty {
-                currentLine = wordStr
-            } else if currentLine.count + 1 + wordStr.count <= maxWidth {
-                currentLine += " " + wordStr
-            } else {
-                lines.append(currentLine)
-                currentLine = wordStr
+        for physicalLine in physicalLines {
+            let lineStr = String(physicalLine)
+
+            // If the line fits within maxWidth, add it directly
+            if lineStr.count <= maxWidth {
+                result.append(lineStr)
+                continue
+            }
+
+            // Word-wrap this physical line
+            let words = lineStr.split(separator: " ", omittingEmptySubsequences: false)
+            var currentLine = ""
+
+            for word in words {
+                let wordStr = String(word)
+                if currentLine.isEmpty {
+                    currentLine = wordStr
+                } else if currentLine.count + 1 + wordStr.count <= maxWidth {
+                    currentLine += " " + wordStr
+                } else {
+                    result.append(currentLine)
+                    currentLine = wordStr
+                }
+            }
+
+            if !currentLine.isEmpty {
+                result.append(currentLine)
             }
         }
 
-        if !currentLine.isEmpty {
-            lines.append(currentLine)
-        }
-
-        return lines.isEmpty ? [""] : lines
+        return result.isEmpty ? [""] : result
     }
 }
