@@ -56,12 +56,14 @@ extension AppHeaderModifier: Renderable {
         appHeader.showDivider = showDivider
 
         // Calculate header height (including divider)
-        let headerHeight = headerBuffer.height + (showDivider ? 1 : 0)
+        // Note: RenderLoop already subtracts this height from the available height
+        // passed to the context, so we don't need to subtract it again here.
+        // let headerHeight = headerBuffer.height + (showDivider ? 1 : 0)
 
         // Adjust context for content to prevent overflow
-        var contentContext = context
-        contentContext.availableHeight = max(0, context.availableHeight - headerHeight)
+        // var contentContext = context
+        // contentContext.availableHeight = max(0, context.availableHeight - headerHeight)
 
-        return TUIkit.renderToBuffer(content, context: contentContext)
+        return TUIkit.renderToBuffer(content, context: context)
     }
 }
