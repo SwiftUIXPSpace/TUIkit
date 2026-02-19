@@ -43,6 +43,11 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
         let minContentHeight = 1 // At least 1 row of content
         let minHeight = borderOverhead + titleOverhead + footerOverhead + minContentHeight
 
+        // We do not calculate actualContentHeight here to avoid rendering all rows (performance)
+        // and to prevent the list from requesting more height than the screen allows,
+        // which would push other views off-screen and break scrolling logic.
+        // The list will expand to fill available space due to isHeightFlexible = true.
+
         return ViewSize(
             width: context.availableWidth,
             height: minHeight,
@@ -99,9 +104,63 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
             contentLines = lines
             listHasFocus = false
         } else {
-            // Calculate viewport height (reserve space for scroll indicators if needed)
-            let availableHeight = context.availableHeight
-            let viewportHeight = max(1, availableHeight - 4) // Reserve for border + indicators
+            // Calculate available space for content (rows + indicators) inside the container
+            // We must calculate this BEFORE determining viewportHeight to ensure we don't
+            // render more rows than can fit.
+            let footerOverhead: Int = (footer is EmptyView || footer == nil) ? 0 : 2
+            let borderOverhead = style.showsBorder ? 2 : 0
+            let titleOverhead = title != nil ? 1 : 0
+            let paddingOverhead = style.rowPadding.top + style.rowPadding.bottom
+            let targetContentHeight = max(1, context.availableHeight - borderOverhead - titleOverhead - footerOverhead - paddingOverhead)
+
+            // Get persistent handler to determine focus state for viewport calculation
+            let handlerKey = StateStorage.StateKey(identity: context.identity, propertyIndex: 0)
+            let handlerBox: StateBox<ItemListHandler<SelectionValue>> = stateStorage.storage(
+                for: handlerKey,
+                default: ItemListHandler(
+                    focusID: FocusRegistration.persistFocusID(context: context, explicitFocusID: focusID, defaultPrefix: "list", propertyIndex: 1),
+                    itemCount: scrollToBottom ? 0 : rows.count,
+                    viewportHeight: 1, // Temporary, will be updated
+                    selectionMode: selectionMode,
+                    canBeFocused: !isDisabled
+                )
+            )
+            let previousHandler = handlerBox.value
+            
+            // Determine target focus index
+            var targetIndex = previousHandler.focusedIndex
+            if scrollToBottom && rows.count > previousHandler.itemCount && rows.count > 0 {
+                targetIndex = rows.count - 1
+            }
+            targetIndex = max(0, min(rows.count - 1, targetIndex))
+            
+            // Calculate adaptive viewport height (in items)
+            // We count how many items fit in the available space, centered/anchored around targetIndex.
+            // We reserve 2 lines for scroll indicators to be safe.
+            let safeContentHeight = max(1, targetContentHeight - 2)
+            var visibleItems = 0
+            var usedHeight = 0
+            
+            // Count backwards from targetIndex
+            for i in stride(from: targetIndex, through: 0, by: -1) {
+                let h = rows[i].buffer.height
+                if usedHeight + h > safeContentHeight { break }
+                usedHeight += h
+                visibleItems += 1
+            }
+            
+            // If space remains, count forwards from targetIndex + 1
+            if usedHeight < safeContentHeight {
+                for i in (targetIndex + 1)..<rows.count {
+                    let h = rows[i].buffer.height
+                    if usedHeight + h > safeContentHeight { break }
+                    usedHeight += h
+                    visibleItems += 1
+                }
+            }
+            
+            // Use this as viewportHeight (in items) for the handler
+            let viewportItemCount = max(1, visibleItems)
 
             let persistedFocusID = FocusRegistration.persistFocusID(
                 context: context,
@@ -109,31 +168,18 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
                 defaultPrefix: "list",
                 propertyIndex: 1  // focusID
             )
-
-            // Get or create persistent handler
-            // When scrollToBottom is enabled, initialize with itemCount=0 so the first
-            // render detects 0→N items increase and triggers scroll-to-bottom.
-            let handlerKey = StateStorage.StateKey(identity: context.identity, propertyIndex: 0)  // handler
-            let handlerBox: StateBox<ItemListHandler<SelectionValue>> = stateStorage.storage(
-                for: handlerKey,
-                default: ItemListHandler(
-                    focusID: persistedFocusID,
-                    itemCount: scrollToBottom ? 0 : rows.count,
-                    viewportHeight: viewportHeight,
-                    selectionMode: selectionMode,
-                    canBeFocused: !isDisabled
-                )
-            )
+            
+            // Reuse the handler box we already retrieved
             let handler = handlerBox.value
-
+            
             // Capture previous item count before updating (for scroll-to-bottom detection)
             let previousItemCount = handler.itemCount
-
+            
             // Update handler with current values
             handler.itemCount = rows.count
-            handler.viewportHeight = viewportHeight
+            handler.viewportHeight = viewportItemCount
             handler.canBeFocused = !isDisabled
-
+            
             // Build selectableIndices set and itemIDs from typed rows
             var selectableIndices = Set<Int>()
             var itemIDs: [SelectionValue?] = []
@@ -149,11 +195,11 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
             }
             handler.itemIDs = itemIDs
             handler.selectableIndices = selectableIndices
-
+            
             // Assign selection bindings directly (type-safe, no AnyHashable conversion)
             handler.singleSelection = singleSelection
             handler.multiSelection = multiSelection
-
+            
             // Auto-scroll to bottom when new items are appended (chat/log-style UIs).
             // Only triggers when itemCount increases, so the user can still scroll up
             // manually. The next time items are added, it will snap back to bottom.
@@ -161,18 +207,22 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
                 let lastSelectableIndex = selectableIndices.max() ?? (rows.count - 1)
                 handler.focusedIndex = lastSelectableIndex
             }
-
+            
             // Ensure focused item is visible
             handler.ensureFocusedItemVisible()
-
+            
             FocusRegistration.register(context: context, handler: handler)
             listHasFocus = FocusRegistration.isFocused(context: context, focusID: persistedFocusID)
-
-            // Calculate visible rows
+            
+            // Calculate available height for rows (subtracting indicators if needed)
+            let indicatorsHeight = (handler.hasContentAbove ? 1 : 0) + (handler.hasContentBelow ? 1 : 0)
+            let renderViewportHeight = max(1, targetContentHeight - indicatorsHeight)
+            
+            // Calculate visible rows using line-based height
             let visibleRows = calculateVisibleRows(
                 rows: rows,
                 handler: handler,
-                viewportHeight: viewportHeight
+                viewportHeight: renderViewportHeight
             )
 
             // Calculate row width based on the widest row content
@@ -234,15 +284,21 @@ struct _ListCore<SelectionValue: Hashable & Sendable, Content: View, Footer: Vie
 
         // Pad content to fill available height (SwiftUI behavior: List is greedy)
         // Reserve space for: title line (1) + top border (1) + bottom border (1) + footer if present
-        let footerHeight = footer != nil ? 2 : 0  // footer line + separator
-        let borderOverhead = style.showsBorder ? 2 : 0  // top + bottom border
+        // Note: targetContentHeight is calculated above in the non-empty branch, but we recalculate here
+        // to handle the empty branch case and keep scope clear.
+        let footerHeight = (footer is EmptyView || footer == nil) ? 0 : 2
+        let borderOverhead = style.showsBorder ? 2 : 0
         let titleOverhead = title != nil ? 1 : 0
-        let targetContentHeight = max(1, context.availableHeight - borderOverhead - titleOverhead - footerHeight)
+        let paddingOverhead = style.rowPadding.top + style.rowPadding.bottom
+        let targetContentHeight = max(1, context.availableHeight - borderOverhead - titleOverhead - footerHeight - paddingOverhead)
 
         var paddedContentLines = contentLines
         if paddedContentLines.count < targetContentHeight {
             let emptyLinesToAdd = targetContentHeight - paddedContentLines.count
             paddedContentLines.append(contentsOf: Array(repeating: "", count: emptyLinesToAdd))
+        } else if paddedContentLines.count > targetContentHeight {
+            // Clip content if it exceeds available height (prevent pushing other views out)
+            paddedContentLines = Array(paddedContentLines.prefix(targetContentHeight))
         }
 
         // Create the list content as a simple view

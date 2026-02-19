@@ -157,8 +157,23 @@ private struct _VStackCore<Content: View>: View, Renderable, Layoutable {
             if child.isSpacer {
                 result.appendVertically(FrameBuffer(emptyWithHeight: finalHeight), spacing: spacingToApply)
             } else {
-                let buffer = child.render(width: context.availableWidth, height: finalHeight, context: context)
-                let alignedBuffer = alignBuffer(buffer, toWidth: alignmentWidth, alignment: alignment)
+                // Explicitly update context with the allocated height for the child
+                // This ensures that the child view (like List) calculates its layout
+                // based on the actual space allocated by VStack, not the full parent height.
+                var childContext = context
+                childContext.availableHeight = finalHeight
+                
+                let buffer = child.render(width: context.availableWidth, height: finalHeight, context: childContext)
+                
+                // Clip buffer to finalHeight to ensure layout integrity
+                let clippedBuffer: FrameBuffer
+                if buffer.height > finalHeight {
+                    clippedBuffer = FrameBuffer(lines: Array(buffer.lines.prefix(finalHeight)))
+                } else {
+                    clippedBuffer = buffer
+                }
+                
+                let alignedBuffer = alignBuffer(clippedBuffer, toWidth: alignmentWidth, alignment: alignment)
                 result.appendVertically(alignedBuffer, spacing: spacingToApply)
             }
         }
